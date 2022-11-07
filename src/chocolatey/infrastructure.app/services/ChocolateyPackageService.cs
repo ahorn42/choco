@@ -643,16 +643,12 @@ Would have determined packages that are out of date based on what is
                 return;
             }
 
-            if (config.RegularOutput) this.Log().Info(ChocolateyLoggers.Important, @"Outdated Packages
- Output is package name | current version | available version | pinned?
-");
-
             config.PackageNames = ApplicationParameters.AllPackages;
             config.UpgradeCommand.NotifyOnlyAvailableUpgrades = true;
 
             var output = config.RegularOutput;
             config.RegularOutput = false;
-            var outdatedPackages = _nugetService.get_outdated(config);
+            var outdatedPackages = _nugetService.get_outdated(config, output);
             config.RegularOutput = output;
             var outdatedPackageCount = outdatedPackages.Count(p => p.Value.Success && !p.Value.Inconclusive);
 

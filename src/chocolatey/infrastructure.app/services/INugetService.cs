@@ -27,7 +27,8 @@ namespace chocolatey.infrastructure.app.services
         ///   Get outdated packages
         /// </summary>
         /// <param name="config">The configuration.</param>
-        ConcurrentDictionary<string, PackageResult> get_outdated(ChocolateyConfiguration config);
+        /// <param name="printTableHeader">True if the header for the package table should be printed, otherwise false.</param>
+        ConcurrentDictionary<string, PackageResult> get_outdated(ChocolateyConfiguration config, bool printTableHeader = false);
 
         /// <summary>
         ///   Run pack in noop mode.

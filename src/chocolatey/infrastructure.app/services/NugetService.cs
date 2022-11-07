@@ -891,7 +891,7 @@ Please see https://docs.chocolatey.org/en-us/troubleshooting for more
             return packageInstalls;
         }
 
-        public virtual ConcurrentDictionary<string, PackageResult> get_outdated(ChocolateyConfiguration config)
+        public virtual ConcurrentDictionary<string, PackageResult> get_outdated(ChocolateyConfiguration config, bool printTableHeader = false)
         {
             var packageManager = NugetCommon.GetPackageManager(
               config,
@@ -908,6 +908,8 @@ Please see https://docs.chocolatey.org/en-us/troubleshooting for more
             var packageNames = config.PackageNames.Split(new[] { ApplicationParameters.PackageNamesSeparator }, StringSplitOptions.RemoveEmptyEntries).or_empty_list_if_null().ToList();
 
             config.start_backup();
+
+            var tableOutputBuffer = new List<string[]>();
 
             foreach (var packageName in packageNames)
             {
@@ -949,7 +951,7 @@ Please see https://docs.chocolatey.org/en-us/troubleshooting for more
                     unfoundResult.Messages.Add(new ResultMessage(ResultType.Warn, unfoundLogMessage));
                     unfoundResult.Messages.Add(new ResultMessage(ResultType.Inconclusive, unfoundLogMessage));
 
-                    this.Log().Warn("{0}|{1}|{1}|{2}".format_with(installedPackage.Id, installedPackage.Version, isPinned.to_string().to_lower()));
+                    tableOutputBuffer.Add(new string[]{ installedPackage.Id, installedPackage.Version.ToString(), installedPackage.Version.ToString(), isPinned.to_string().to_lower() });
                     continue;
                 }
 
@@ -960,7 +962,7 @@ Please see https://docs.chocolatey.org/en-us/troubleshooting for more
                 string logMessage = "You have {0} v{1} installed. Version {2} is available based on your source(s).{3} Source(s): \"{4}\"".format_with(installedPackage.Id, installedPackage.Version, latestPackage.Version, Environment.NewLine, config.Sources);
                 packageResult.Messages.Add(new ResultMessage(ResultType.Note, logMessage));
 
-                this.Log().Info("{0}|{1}|{2}|{3}".format_with(installedPackage.Id, installedPackage.Version, latestPackage.Version, isPinned.to_string().to_lower()));
+                tableOutputBuffer.Add(new string[]{ installedPackage.Id, installedPackage.Version.ToString(), latestPackage.Version.ToString(), isPinned.to_string().to_lower() });
 
                 if (pkgInfo.IsSideBySide)
                 {
@@ -969,6 +971,42 @@ Please see https://docs.chocolatey.org/en-us/troubleshooting for more
 Side by side installations are deprecated and is pending removal in v2.0.0".format_with(installedPackage.Id, installedPackage.Version);
 
                     packageResult.Messages.Add(new ResultMessage(ResultType.Warn, deprecationMessage));
+                }
+            }
+
+            if (printTableHeader) tableOutputBuffer.Insert(0, new string[] {"package name", "current version", "available version", "pinned?"});
+
+            // determin maximum length of the entries in each column
+            var maxOutputLength = new int[] { 
+                tableOutputBuffer.Select(f => f[0].Length).Max(),
+                tableOutputBuffer.Select(f => f[1].Length).Max(),
+                tableOutputBuffer.Select(f => f[2].Length).Max(),
+                tableOutputBuffer.Select(f => f[3].Length).Max()
+            };
+
+            if (printTableHeader) 
+            {
+                var firstLine = tableOutputBuffer.First();
+                var tableHead = $"{ firstLine[0].PadRight(maxOutputLength[0]) } | { firstLine[1].PadLeft(maxOutputLength[1]) } | { firstLine[2].PadLeft(maxOutputLength[2]) } | { firstLine[3].PadLeft(maxOutputLength[3]) }";
+                this.Log().Info(ChocolateyLoggers.Important, $@"Outdated Packages
+ Output is 
+{ tableHead }
+{ "".PadLeft(tableHead.Length, '-') }");
+                tableOutputBuffer.RemoveAt(0);
+            }
+
+            foreach(var tableOutput in tableOutputBuffer) {
+                var output = 
+                    tableOutput[0].PadRight(maxOutputLength[0]) + " | " +
+                    tableOutput[1].PadLeft(maxOutputLength[1]) + " | " +
+                    tableOutput[2].PadLeft(maxOutputLength[2]) + " | " +
+                    tableOutput[3].PadLeft(maxOutputLength[3]);
+
+                // in case current and available versions are equal we could not found the package based on the sources and print it as warning
+                if (tableOutput[1] == tableOutput[2]) {
+                    this.Log().Warn(output);
+                } else {
+                    this.Log().Info(output);
                 }
             }
 
